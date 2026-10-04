@@ -1320,7 +1320,11 @@ def fetch_kline(kind, code, typ):
 
 
 # ================================================================ HTTP 服务
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# PyInstaller 打包后资源解压到 sys._MEIPASS；源码运行时用脚本所在目录
+if getattr(sys, "frozen", False):
+    BASE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+else:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 PORT = int(os.environ.get("GFD_PORT", "8770"))
 

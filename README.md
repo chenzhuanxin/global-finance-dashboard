@@ -34,7 +34,14 @@
 
 ## 🚀 快速开始
 
-### Windows（推荐）
+### 方式一：免安装 EXE（Windows 推荐）
+1. 到 [Releases](https://github.com/chenzhuanxin/global-finance-dashboard/releases) 下载 `全球金融数据看板-vX.X.exe`
+2. **双击即用**——自动启动数据服务并打开浏览器 `http://127.0.0.1:8770/`，关闭窗口即退出
+3. 已在运行时再次双击，会直接打开浏览器（不会重复起服务）
+
+> 无需安装 Python；首次启动解压自释放约需 2~3 秒。
+
+### 方式二：源码运行
 1. 安装 [Python 3.8+](https://www.python.org/downloads/)（安装时勾选 *Add to PATH*）
 2. 安装依赖：
    ```
@@ -90,11 +97,15 @@ python3 server.py
 ```
 global-finance-dashboard/
 ├── server.py               # 后端：抓取 + 缓存 + 本地 HTTP 服务（约 1350 行）
+├── launcher.py             # EXE 启动器：起服务 + 自动打开浏览器
 ├── static/
 │   ├── index.html          # 前端单页应用（约 1250 行，含全部样式与逻辑）
+│   ├── logo.png            # 站点图标（浏览器标签页）
 │   └── vendor/
 │       └── echarts.min.js  # ECharts 5.5.0 本地化（离线可用）
-├── 启动.bat                 # Windows 一键启动
+├── assets/
+│   └── logo.ico            # 应用图标（EXE 用）
+├── 启动.bat                 # Windows 一键启动（源码方式）
 ├── README.md
 └── docs/
     ├── 项目说明.md          # 架构 / 模块 / 数据源 / 接口文档 / 技术要点

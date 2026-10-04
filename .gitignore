@@ -23,3 +23,9 @@ desktop.ini
 # 编辑器
 .vscode/
 .idea/
+
+# PyInstaller 打包产物
+build/
+dist/
+*.spec
+assets/Modern_flat_*.png
