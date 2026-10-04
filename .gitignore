@@ -1,0 +1,25 @@
+# 运行产物
+server.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 备份与临时
+*.bak
+*.tmp
+probe/
+shot/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/

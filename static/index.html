@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>全球金融数据看板</title>
+<script src="/vendor/echarts.min.js"></script>
+<style>
+:root{
+  --bg:#eef1f6; --bg2:#ffffff; --panel:#ffffff; --panel2:#f7f9fc;
+  --text:#1a2130; --text2:#4a5568; --muted:#8a94a6; --line:#e2e8f0; --line2:#eef2f7;
+  --up:#d6353b; --down:#12a05c; --accent:#2f6fe4; --accent2:#eaf1ff;
+  --shadow:0 1px 2px rgba(20,32,54,.05), 0 6px 18px -8px rgba(20,32,54,.12);
+  --radius:12px; --head:#f2f5fa;
+}
+html[data-theme="dark"]{
+  --bg:#0e131b; --bg2:#151b25; --panel:#171e29; --panel2:#1d2532;
+  --text:#e8edf5; --text2:#a9b4c5; --muted:#6f7d92; --line:#26303f; --line2:#212a37;
+  --up:#ff5c62; --down:#28cb7e; --accent:#5b93ff; --accent2:#1c2740;
+  --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 22px -10px rgba(0,0,0,.6);
+  --head:#1b2330;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font:13px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1560px;margin:0 auto;padding:0 18px 60px}
+
+/* ---------------- 顶栏 ---------------- */
+.topbar{position:sticky;top:0;z-index:60;background:var(--bg2);border-bottom:1px solid var(--line);
+  box-shadow:0 1px 12px -6px rgba(20,32,54,.25)}
+.topbar .inner{max-width:1560px;margin:0 auto;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;font-size:15.5px;font-weight:700;letter-spacing:.2px}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px var(--accent2)}
+.brand small{font-weight:500;color:var(--muted);font-size:11.5px;letter-spacing:0}
+.tools{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{appearance:none;border:1px solid var(--line);background:var(--panel);color:var(--text2);
+  padding:5px 11px;border-radius:8px;font-size:12px;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.status{font-size:11.5px;color:var(--muted);white-space:nowrap}
+
+/* ---------------- 板块类型选择（导航）---------------- */
+.secnav{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0 14px}
+.secnav button{
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:10px 8px;border:1px solid var(--line);background:var(--panel);color:var(--text2);
+  border-radius:10px;font-size:12.5px;cursor:pointer;transition:.15s;font-family:inherit;
+}
+.secnav button:hover{border-color:var(--accent);color:var(--accent);background:var(--accent2)}
+.secnav button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.secnav button .n{font-size:10.5px;opacity:.75}
+
+/* ---------------- 板块 ---------------- */
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden}
+.sec.dragging{opacity:.45;border-style:dashed}
+.sec.drop-target{outline:2px solid var(--accent);outline-offset:-2px}
+.sec-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;
+  background:var(--head);border-bottom:1px solid transparent;user-select:none}
+.sec-head:hover{background:var(--panel2)}
+.sec:not(.closed) .sec-head{border-bottom-color:var(--line)}
+.sec-head .grip{cursor:grab;color:var(--muted);font-size:13px;letter-spacing:-1px;padding:0 2px}
+.sec-head .grip:active{cursor:grabbing}
+.sec-head h2{margin:0;font-size:14px;font-weight:650;letter-spacing:.2px;white-space:nowrap}
+.sec-head .cidx{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:5px;
+  padding:0 5px;line-height:16px}
+.sec-head .sum{margin-left:auto;display:flex;gap:12px;align-items:center;font-size:12px;
+  color:var(--text2);overflow:hidden;white-space:nowrap;flex-wrap:nowrap}
+.sec-head .sum b{font-weight:650;font-variant-numeric:tabular-nums}
+.sec-head .src{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 数据源链接 */
+.slink{color:var(--muted);border-bottom:1px dashed var(--line);text-decoration:none;cursor:pointer}
+.slink:hover{color:var(--accent);border-bottom-color:var(--accent);text-decoration:none}
+.sep{margin:0 4px;color:var(--line);font-size:10px}
+.grp-title .gsrc{font-weight:400;font-size:11px;color:var(--muted);white-space:nowrap}
+.grp-title .gsrc:last-child{margin-left:auto}
+.cp-src{font-size:11px;color:var(--muted);white-space:nowrap}
+/* 折叠箭头：圆形底衬 + 加粗箭头，明显可见 */
+.sec-head .chev{position:relative;flex:0 0 22px;width:22px;height:22px;border-radius:50%;
+  background:var(--line2);color:var(--text2);transition:background .18s,color .18s,transform .18s}
+.sec-head .chev::before{content:"";position:absolute;left:6.5px;top:6px;width:8px;height:8px;
+  border-right:2.6px solid currentColor;border-bottom:2.6px solid currentColor;
+  transform:rotate(45deg);transition:transform .18s}
+.sec-head:hover .chev{background:var(--accent);color:#fff;transform:scale(1.08)}
+.sec.closed .sec-head .chev::before{transform:rotate(-45deg)}
+.sec.closed .sec-body{display:none}
+.sec-body{padding:13px 14px 15px}
+
+/* ---------------- 通用 ---------------- */
+.grp-title{display:flex;align-items:center;gap:8px;margin:10px 0 9px;font-size:12.5px;color:var(--text2);
+  font-weight:600;cursor:pointer;user-select:none;padding:5px 9px;border-radius:8px;transition:background .15s}
+.grp:first-child>.grp-title{margin-top:0}
+.grp-title:hover{background:var(--panel2)}
+.grp-title.plain{cursor:default}
+.grp-title.plain:hover{background:transparent}
+.grp-title .cnt{font-weight:400;color:var(--muted);font-size:11.5px}
+.grp-title .sp{margin-left:auto}
+/* 二级分类折叠箭头 */
+.grp-title .gchev{position:relative;flex:0 0 17px;width:17px;height:17px;border-radius:50%;
+  background:var(--line2);color:var(--text2);transition:background .18s,color .18s}
+.grp-title .gchev::before{content:"";position:absolute;left:5px;top:4.5px;width:6px;height:6px;
+  border-right:2.3px solid currentColor;border-bottom:2.3px solid currentColor;
+  transform:rotate(45deg);transition:transform .18s}
+.grp-title:hover .gchev{background:var(--accent);color:#fff}
+.grp.closed>.grp-body{display:none}
+.grp.closed>.grp-title .gchev::before{transform:rotate(-45deg)}
+.grp.closed>.grp-title{margin-bottom:2px}
+/* 二级分类内容缩进，层级更清晰 */
+.grp>.grp-body{padding-top:1px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:var(--panel);color:var(--text2);
+  border-radius:20px;padding:4px 11px;font-size:12px;cursor:pointer;transition:.15s;font-family:inherit}
+.chips button:hover{border-color:var(--accent);color:var(--accent)}
+.chips button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+input[type=search],select{border:1px solid var(--line);background:var(--panel);color:var(--text);
+  border-radius:8px;padding:5px 10px;font-size:12.5px;outline:none;font-family:inherit}
+input[type=search]:focus,select:focus{border-color:var(--accent)}
+.empty{padding:22px;text-align:center;color:var(--muted);font-size:12.5px}
+.warn{margin:8px 0 0;padding:8px 11px;border-radius:8px;background:rgba(214,53,59,.08);
+  border:1px solid rgba(214,53,59,.25);color:var(--up);font-size:12px}
+.up{color:var(--up)} .down{color:var(--down)} .flat{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* 网格 */
+.grid{display:grid;gap:9px}
+.g-fx{grid-template-columns:repeat(auto-fill,minmax(186px,1fr))}
+.g-idx{grid-template-columns:repeat(auto-fill,minmax(206px,1fr))}
+.g-coin{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.g-fut{grid-template-columns:repeat(auto-fill,minmax(196px,1fr))}
+
+/* 卡片 */
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px;
+  cursor:pointer;transition:.15s;position:relative}
+.card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:var(--shadow)}
+.card.active{border-color:var(--accent);background:var(--accent2)}
+.card .c-name{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .c-name .tag{font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.card .c-name .cty{color:var(--text);font-weight:700;font-size:12.5px;overflow:hidden;text-overflow:ellipsis}
+.card .c-price{font-size:19px;font-weight:700;letter-spacing:-.4px;margin:5px 0 3px;
+  font-variant-numeric:tabular-nums;line-height:1.16;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .c-sub{display:flex;justify-content:space-between;font-size:11.5px;font-variant-numeric:tabular-nums;
+  color:var(--muted);gap:8px}
+.card .c-sub span{white-space:nowrap}
+.card.hl{background:linear-gradient(180deg,var(--accent2),var(--panel2));border-color:var(--accent)}
+
+/* K线展开面板 */
+.chart-panel{grid-column:1/-1;background:var(--panel2);border:1px solid var(--accent);
+  border-radius:11px;padding:11px 12px 6px;margin-top:2px}
+.cp-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.cp-title{font-size:13px;font-weight:650}
+.cp-tabs{display:flex;gap:4px}
+.cp-tabs button{border:1px solid var(--line);background:var(--panel);color:var(--text2);
+  border-radius:7px;padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.cp-tabs button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.cp-tabs button:disabled{opacity:.4;cursor:not-allowed}
+.cp-meta{margin-left:auto;display:flex;gap:12px;font-size:11.5px;color:var(--text2);flex-wrap:wrap}
+#cpMeta{display:contents}   /* 让统计项直接成为 .cp-meta 的 flex 子项，共享 gap */
+.cp-meta b{font-variant-numeric:tabular-nums}
+.cp-close{border:1px solid var(--line);background:var(--panel);color:var(--text2);border-radius:7px;
+  padding:3px 10px;font-size:11.5px;cursor:pointer;font-family:inherit}
+.cp-close:hover{border-color:var(--up);color:var(--up)}
+.cp-chart{width:100%;height:288px}
+.cp-note{font-size:11px;color:var(--muted);margin:-2px 0 6px}
+
+/* 表格 */
+.tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;max-height:620px}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;background:var(--panel)}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line2);white-space:nowrap}
+th{position:sticky;top:0;background:var(--head);font-weight:650;font-size:11.5px;color:var(--text2);z-index:2}
+tbody tr:hover{background:var(--panel2)}
+tbody tr:last-child td{border-bottom:none}
+td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+.pager{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;font-size:12px;color:var(--text2)}
+.pager .pg-btn{border:1px solid var(--line);background:var(--panel);border-radius:7px;padding:4px 10px;
+  cursor:pointer;font-size:12px;font-family:inherit;color:var(--text2)}
+.pager .pg-btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.pager .pg-btn:disabled{opacity:.4;cursor:not-allowed}
+.pager .sp{margin-left:auto;display:flex;align-items:center;gap:8px}
+
+/* 指数对比条 */
+.bars{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+.bar-row{display:grid;grid-template-columns:130px 1fr 80px;gap:9px;align-items:center;font-size:12px}
+.bar-track{height:9px;border-radius:5px;background:var(--line2);overflow:hidden;position:relative}
+.bar-fill{height:100%;border-radius:5px;background:var(--accent)}
+.bar-val{text-align:right;font-variant-numeric:tabular-nums;color:var(--text2)}
+
+/* 统计小卡 */
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:9px}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.stat .s-k{font-size:11.5px;color:var(--muted)}
+.stat .s-v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:3px}
+.stat .s-d{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+.chart-box{width:100%;height:280px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ---------------- 美国国债：对比指标 + 图表工具条 ---------------- */
+.cmp{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:10px;margin-bottom:12px}
+.cmp .c{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+.cmp .c-k{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.cmp .c-v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px;letter-spacing:.2px}
+.cmp .c-d{font-size:11px;color:var(--muted);margin-top:3px}
+.plot-tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:8px}
+.plot-tools .tlab{font-size:11.5px;color:var(--muted);margin-right:2px}
+.plot-tools button{border:1px solid var(--line);background:var(--panel);color:var(--text2);
+  border-radius:7px;padding:4px 10px;font-size:11.5px;cursor:pointer;font-family:inherit;transition:.15s}
+.plot-tools button:hover{border-color:var(--accent);color:var(--accent)}
+.plot-tools button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* ---------------- 页脚：数据源清单 + 作者信息 ---------------- */
+.foot{margin-top:24px;border-top:1px solid var(--line);padding-top:16px}
+.foot .fh{font-size:12.5px;font-weight:650;color:var(--text2);margin:0 0 10px;
+  display:flex;align-items:center;gap:9px;flex-wrap:wrap;cursor:pointer;user-select:none}
+.foot .fh .cnt{font-weight:400;color:var(--muted);font-size:11.5px}
+.foot .fh .tg{margin-left:auto;font-size:11.5px;color:var(--muted);font-weight:400}
+.src-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:0 16px}
+.foot.closed .src-grid{display:none}
+.src-it{font-size:11.5px;color:var(--text2);display:flex;gap:8px;align-items:baseline;
+  border-bottom:1px dashed var(--line2);padding:5px 0}
+.src-it .k{color:var(--muted);flex:0 0 106px;white-space:nowrap}
+.src-it .v{min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.src-it .v a{color:var(--accent);font-size:11px}
+.credit{margin-top:18px;padding:16px 10px 8px;border-top:1px dashed var(--line);text-align:center}
+.credit .by{font-size:14px;font-weight:700;color:var(--text);letter-spacing:.3px}
+.credit .by b{color:var(--accent)}
+.credit .sub{margin-top:6px;font-size:11.5px;color:var(--muted);line-height:1.9}
+.foot-note{margin:12px auto 0;max-width:940px;font-size:11px;color:var(--muted);
+  line-height:1.85;text-align:center}
+
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+@media (max-width:760px){
+  .secnav{grid-template-columns:repeat(2,1fr)}
+  .g-fx,.g-idx,.g-coin,.g-fut{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .sec-head .sum{display:none}
+  .src-grid{grid-template-columns:1fr}
+  .src-it .k{flex:0 0 84px}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="inner">
+    <div class="brand"><span class="dot"></span>全球金融数据看板</div>
+    <div class="tools">
+      <span class="status" id="status">正在加载…</span>
+      <button class="btn" id="allOpen">全部展开</button>
+      <button class="btn" id="allClose">全部收起</button>
+      <button class="btn" id="autoBtn">自动刷新 关</button>
+      <button class="btn" id="reload">刷新</button>
+      <button class="btn" id="themeBtn">深色</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <!-- 板块类型选择：按钮，每行 4 个 -->
+  <nav class="secnav" id="secnav"></nav>
+  <main id="main"></main>
+
+  <!-- 页脚：数据源清单 + 作者信息 -->
+  <footer class="foot" id="foot">
+    <div class="fh" id="footHead">
+      <span>数据源清单</span>
+      <span class="cnt" id="footCnt"></span>
+      <span class="tg" id="footTg">点击收起 / 展开 ▾</span>
+    </div>
+    <div class="src-grid" id="srcGrid"></div>
+
+    <div class="credit">
+      <div class="by">设计：<b>公歧子</b>　微信：<b>gongqizi0</b></div>
+      <div class="sub">全球金融数据看板 · 数据采集与可视化</div>
+    </div>
+    <div class="foot-note" id="footNote"></div>
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ================================================================
+   全局
+================================================================ */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const S = {};                       // 各板块数据
+let autoTimer = null;
+let openPanel = null;               // 当前展开的图表 {key, el, chart}
+
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function fmt(p, d){
+  if(p == null || isNaN(p)) return "—";
+  if(d == null) d = digitsOf(p);
+  return Number(p).toLocaleString("zh-CN", {minimumFractionDigits:d, maximumFractionDigits:d});
+}
+function digitsOf(p){
+  if(p == null || isNaN(p)) return 2;
+  const a = Math.abs(p);
+  if(a >= 1000) return 2;
+  if(a >= 100) return 2;
+  if(a >= 10)  return 3;
+  if(a >= 1)   return 4;
+  if(a >= .01) return 5;
+  if(a >= .0001) return 7;
+  return 9;
+}
+function cls(v){ return v > 0 ? "up" : (v < 0 ? "down" : "flat"); }
+function pctStr(v){ return (v == null || isNaN(v)) ? "—" : (v > 0 ? "+" : "") + v.toFixed(2) + "%"; }
+function bpStr(v){ return (v == null || isNaN(v)) ? "—" : (v > 0 ? "+" : "") + v.toFixed(1) + "bp"; }
+function bigN(v){
+  if(v == null || isNaN(v)) return "—";
+  const a = Math.abs(v);
+  if(a >= 1e12) return (v / 1e12).toFixed(3) + " 万亿";
+  if(a >= 1e8)  return (v / 1e8).toFixed(2) + " 亿";
+  if(a >= 1e4)  return (v / 1e4).toFixed(2) + " 万";
+  return fmt(v, 2);
+}
+async function api(path){
+  const r = await fetch(path, {cache:"no-store"});
+  if(!r.ok) throw new Error("HTTP " + r.status);
+  return await r.json();
+}
+
+/* ================================================================
+   数据源 / 信号源登记表
+   —— 全部为公开、真实、可访问的上游接口，已逐一实测（HTTP 200 + 返回真实行情）
+================================================================ */
+const SRC = {
+  fxLive:   {n:"新浪财经·外汇行情",       u:"https://finance.sina.com.cn/money/forex/hq/USDCNY.shtml"},
+  fxHis:    {n:"新浪财经·外汇历史行情",   u:"https://vip.stock.finance.sina.com.cn/forex/api/jsonp.php"},
+  cnIdx:    {n:"新浪财经·A股指数行情",    u:"https://finance.sina.com.cn/realstock/company/sh000001/nc.shtml"},
+  hkIdx:    {n:"新浪财经·港股指数行情",   u:"https://stock.finance.sina.com.cn/hkstock/quotes/HSI.html"},
+  txHis:    {n:"腾讯证券·K线与分时",      u:"https://gu.qq.com/"},
+  jjhIdx:   {n:"金投网·全球股指行情",     u:"https://quote.cngold.org/gp/hqgz.html"},
+  jjhHis:   {n:"金投网·全球股指历史K线",  u:"https://api.jijinhao.com/history/quotejs.htm"},
+  sinaUS:   {n:"新浪财经·美股指数",       u:"https://stock.finance.sina.com.cn/usstock/quotes/.DJI.html"},
+  sinaFut:  {n:"新浪财经·国际期货（外盘）",u:"https://finance.sina.com.cn/futures/quotes/GC.shtml"},
+  sinaFutH: {n:"新浪财经·全球期货历史行情",u:"https://stock.finance.sina.com.cn/futures/api/jsonp.php"},
+  sinaCry:  {n:"新浪财经·区块链行情",     u:"https://finance.sina.com.cn/blockchain/hq.shtml"},
+  gate:     {n:"Gate.io·虚拟币现货K线",   u:"https://api.gateio.ws/api/v4/spot/candlesticks"},
+  rmb:      {n:"中国货币网·人民币汇率指数",u:"https://www.chinamoney.com.cn/chinese/bkrmbidx/"},
+  rmbHis:   {n:"中国货币网·指数历史曲线", u:"https://www.chinamoney.com.cn/ags/ms/cm-u-bk-fx/RmbIdxChrt?indexType=3"},
+  bondLive: {n:"新浪财经·全球国债收益率", u:"https://stock.finance.sina.com.cn/forex/globalbd/us10yt.html"},
+  bondHis:  {n:"新浪财经·国债历史行情",   u:"https://bond.finance.sina.com.cn/hq/gb/daily?symbol=us10yt"},
+  debt:     {n:"美国财政部·Debt to the Penny", u:"https://fiscaldata.treasury.gov/datasets/debt-to-the-penny/debt-to-the-penny"},
+  rate:     {n:"金投网·各国央行利率日历", u:"http://calendar.cngold.org/rate.htm"}
+};
+/* 页脚数据源清单：[用途, 来源数组] */
+const SOURCE_LIST = [
+  ["汇率 · 实时行情",      [SRC.fxLive]],
+  ["汇率 · 日K/分时",      [SRC.fxHis]],
+  ["中国股市指数",         [SRC.cnIdx, SRC.txHis]],
+  ["中国香港股市指数",     [SRC.hkIdx, SRC.txHis]],
+  ["亚太/欧洲/美洲股指",   [SRC.jjhIdx, SRC.jjhHis]],
+  ["美股三大指数",         [SRC.jjhIdx, SRC.sinaUS]],
+  ["美股指数期货",         [SRC.sinaFut, SRC.sinaFutH]],
+  ["虚拟币 · 实时行情",    [SRC.sinaCry]],
+  ["虚拟币 · 日K/月K",     [SRC.gate]],
+  ["国际期货 · 实时行情",  [SRC.sinaFut]],
+  ["国际期货 · 日K/分时",  [SRC.sinaFutH]],
+  ["人民币汇率指数",       [SRC.rmb, SRC.rmbHis]],
+  ["各国国债收益率",       [SRC.bondLive]],
+  ["国债 · 日K/分时",      [SRC.bondHis]],
+  ["美国国债余额数据",     [SRC.debt]],
+  ["各国央行利率",         [SRC.rate]]
+];
+
+function slinks(list){
+  return (list || []).map(s =>
+    '<a class="slink" href="' + s.u + '" target="_blank" rel="noopener noreferrer" title="' + esc(s.u) + '">' +
+    esc(s.n) + '</a>').join('<span class="sep">·</span>');
+}
+function gsrc(list){
+  return (list && list.length) ? '<span class="gsrc">数据源：' + slinks(list) + '</span>' : "";
+}
+
+/* ================================================================
+   板块定义（srcs = 该板块真实数据源）
+================================================================ */
+const SECTIONS = [
+  {id:"fx",     title:"汇率行情",       srcs:[SRC.fxLive, SRC.fxHis],  open:true },
+  {id:"world",  title:"世界股市行情",   srcs:[SRC.cnIdx, SRC.hkIdx, SRC.jjhIdx], open:true },
+  {id:"us",     title:"美股三大指数与指数期货", srcs:[SRC.jjhIdx, SRC.sinaFut], open:true },
+  {id:"crypto", title:"虚拟币行情",     srcs:[SRC.sinaCry, SRC.gate], open:true },
+  {id:"fut",    title:"国际期货行情",   srcs:[SRC.sinaFut, SRC.sinaFutH], open:true },
+  {id:"rmb",    title:"人民币汇率指数", srcs:[SRC.rmb], open:false },
+  {id:"bond",   title:"世界各国国债收益率", srcs:[SRC.bondLive, SRC.bondHis], open:false },
+  {id:"debt",   title:"美国国债数据",   srcs:[SRC.debt], open:false },
+  {id:"rate",   title:"各国央行利率",   srcs:[SRC.rate], open:false }
+];
+
+const LS_ORDER = "gfd.order.v2", LS_CLOSED = "gfd.closed.v2", LS_THEME = "gfd.theme";
+
+function getOrder(){
+  let o = [];
+  try{ o = JSON.parse(localStorage.getItem(LS_ORDER) || "[]"); }catch(e){ o = []; }
+  const ids = SECTIONS.map(s => s.id);
+  o = o.filter(x => ids.includes(x));
+  ids.forEach(x => { if(!o.includes(x)) o.push(x); });
+  return o;
+}
+function getClosed(){
+  let c = null;
+  try{ c = JSON.parse(localStorage.getItem(LS_CLOSED) || "null"); }catch(e){ c = null; }
+  if(c == null) return SECTIONS.filter(s => !s.open).map(s => s.id);
+  return c;
+}
+function setClosed(list){ localStorage.setItem(LS_CLOSED, JSON.stringify(list)); }
+
+/* ================================================================
+   构建骨架
+================================================================ */
+function buildShell(){
+  const defs = {};
+  SECTIONS.forEach(s => defs[s.id] = s);
+  const main = $("#main");
+  main.innerHTML = getOrder().map((id, i) => {
+    const d = defs[id];
+    return `<section class="sec" data-id="${d.id}" id="sec-${d.id}">
+      <div class="sec-head" draggable="true">
+        <span class="grip" title="拖动可调整板块顺序">⣿</span>
+        <span class="chev" title="点击折叠 / 展开本板块"></span>
+        <h2>${esc(d.title)}</h2>
+        <span class="cidx">${i + 1}</span>
+        <span class="sum" id="sum-${d.id}"></span>
+        <span class="src">数据源：${slinks(d.srcs)}</span>
+      </div>
+      <div class="sec-body" id="body-${d.id}"><div class="empty">正在加载…</div></div>
+    </section>`;
+  }).join("");
+
+  const closed = getClosed();
+  $$(".sec", main).forEach(el => { if(closed.includes(el.dataset.id)) el.classList.add("closed"); });
+
+  // 顶部类型选择按钮（每行 4 个）
+  $("#secnav").innerHTML = getOrder().map(id => {
+    const d = defs[id];
+    return `<button data-go="${d.id}">${esc(d.title)}</button>`;
+  }).join("");
+  $$("#secnav button").forEach(b => b.addEventListener("click", () => {
+    const el = $("#sec-" + b.dataset.go);
+    el.classList.remove("closed");
+    saveClosedFromDom();
+    resizeChartsIn(el);
+    el.scrollIntoView({behavior:"smooth", block:"start"});
+    window.scrollBy(0, -70);
+    flash(b);
+  }));
+
+  // 折叠
+  $$(".sec .sec-head", main).forEach(h => h.addEventListener("click", e => {
+    if(e.target.closest(".grip")) return;
+    const sec = h.parentElement;
+    sec.classList.toggle("closed");
+    saveClosedFromDom();
+    if(!sec.classList.contains("closed")) resizeChartsIn(sec);
+  }));
+  bindDrag();
+}
+/* 板块由折叠变为展开时，内部图表需重新测量尺寸（初始化时可能处于 display:none） */
+function resizeChartsIn(sec){
+  setTimeout(() => {
+    $$(".chart-box, .cp-chart", sec).forEach(b => {
+      const c = echarts.getInstanceByDom(b);
+      if(c) c.resize();
+    });
+  }, 60);
+}
+function saveClosedFromDom(){
+  setClosed($$(".sec").filter(el => el.classList.contains("closed")).map(el => el.dataset.id));
+}
+function flash(el){ el.classList.add("on"); setTimeout(() => el.classList.remove("on"), 900); }
+
+/* ---------------- 页脚：数据源清单 + 作者信息 ---------------- */
+function buildFooter(){
+  const grid = $("#srcGrid");
+  if(!grid) return;
+  grid.innerHTML = SOURCE_LIST.map(([k, list]) =>
+    '<div class="src-it"><span class="k">' + esc(k) + '</span><span class="v">' +
+    list.map(s => '<a href="' + s.u + '" target="_blank" rel="noopener noreferrer" title="' +
+      esc(s.n + "　" + s.u) + '">' + esc(s.n) + '</a>')
+      .join('<span class="sep">·</span>') + '</span></div>').join("");
+  const n = SOURCE_LIST.reduce((a, x) => a + x[1].length, 0);
+  $("#footCnt").textContent = "共 " + SOURCE_LIST.length + " 类 · " + n + " 个上游站点";
+  $("#footNote").innerHTML =
+    "本看板全部行情均通过公开接口实时抓取，数据源 / 信号源已逐项标注并附原始链接，" +
+    "可点击跳转上游页面自行核对。行情数据仅供研究与学习参考，不构成任何投资建议。" +
+    "受上游接口调整、市场休市或网络波动影响，个别品种可能出现延迟或暂无数据。";
+  const head = $("#footHead");
+  if(head) head.addEventListener("click", () => $("#foot").classList.toggle("closed"));
+}
+
+/* ---------------- 拖动排序 ---------------- */
+function bindDrag(){
+  const main = $("#main");
+  let dragEl = null;
+  $$(".sec", main).forEach(sec => {
+    const head = $(".sec-head", sec);
+    head.addEventListener("dragstart", e => {
+      if(e.target.closest(".sum") || e.target.tagName === "BUTTON"){ e.preventDefault(); return; }
+      dragEl = sec; sec.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try{ e.dataTransfer.setData("text/plain", sec.dataset.id); }catch(err){}
+    });
+    head.addEventListener("dragend", () => {
+      sec.classList.remove("dragging");
+      $$(".sec", main).forEach(x => x.classList.remove("drop-target"));
+      if(dragEl){ persistOrder(); dragEl = null; }
+    });
+    sec.addEventListener("dragover", e => {
+      if(!dragEl || dragEl === sec) return;
+      e.preventDefault();
+      const r = sec.getBoundingClientRect();
+      const after = (e.clientY - r.top) > r.height / 2;
+      sec.parentElement.insertBefore(dragEl, after ? sec.nextSibling : sec);
+      sec.classList.add("drop-target");
+    });
+    sec.addEventListener("dragleave", () => sec.classList.remove("drop-target"));
+    sec.addEventListener("drop", e => e.preventDefault());
+  });
+}
+function persistOrder(){
+  const ids = $$(".sec").map(el => el.dataset.id);
+  localStorage.setItem(LS_ORDER, JSON.stringify(ids));
+  $$(".sec").forEach((el, i) => { const c = $(".cidx", el); if(c) c.textContent = i + 1; });
+  const defs = {}; SECTIONS.forEach(s => defs[s.id] = s);
+  $("#secnav").innerHTML = ids.map(id => `<button data-go="${id}">${esc(defs[id].title)}</button>`).join("");
+  $$("#secnav button").forEach(b => b.addEventListener("click", () => {
+    const el = $("#sec-" + b.dataset.go);
+    el.classList.remove("closed"); saveClosedFromDom();
+    el.scrollIntoView({behavior:"smooth", block:"start"});
+    window.scrollBy(0, -70); flash(b);
+  }));
+}
+
+/* ================================================================
+   图表
+================================================================ */
+function axColor(){ return getComputedStyle(document.body).getPropertyValue("--muted").trim() || "#8a94a6"; }
+function txtColor(){ return getComputedStyle(document.body).getPropertyValue("--text").trim() || "#1a2130"; }
+function lineColor(){ return getComputedStyle(document.body).getPropertyValue("--line").trim() || "#e2e8f0"; }
+function upColor(){ return getComputedStyle(document.body).getPropertyValue("--up").trim() || "#d6353b"; }
+function downColor(){ return getComputedStyle(document.body).getPropertyValue("--down").trim() || "#12a05c"; }
+
+function closePanel(){
+  if(openPanel){
+    if(openPanel.chart){ try{ openPanel.chart.dispose(); }catch(e){} }
+    const card = $("#" + openPanel.cardId);
+    if(card) card.classList.remove("active");
+    openPanel.el.remove();
+    openPanel = null;
+  }
+}
+
+/**
+ * K 线数据来源（对应后端 /api/kline 的 kind）
+ */
+function chartSrc(kind, code){
+  if(kind === "fx")     return [SRC.fxHis];
+  if(kind === "bond")   return [SRC.bondHis];
+  if(kind === "crypto") return [SRC.gate];
+  if(kind === "index")  return (code || "").startsWith("JO_") ? [SRC.jjhHis] : [SRC.txHis];
+  if(kind === "us")     return (code || "").startsWith("JO_") ? [SRC.jjhHis] : [SRC.sinaFutH];
+  if(kind === "futures")return [SRC.sinaFutH];
+  return [];
+}
+
+/**
+ * 在卡片下方插入可折叠的图表面板
+ * kind: fx | bond | index | us | crypto | futures
+ */
+function toggleChart(cardEl, kind, code, name, opts){
+  const key = kind + ":" + code;
+  if(openPanel && openPanel.key === key){ closePanel(); return; }
+  closePanel();
+
+  const allowInv = !!(opts && opts.invert);            // 汇率支持正反向
+  const panel = document.createElement("div");
+  panel.className = "chart-panel";
+  panel.innerHTML =
+    '<div class="cp-head">' +
+      '<span class="cp-title">' + esc(name) + '</span>' +
+      '<span class="cp-tabs">' +
+        '<button data-t="min">分时</button>' +
+        '<button data-t="day" class="on">日K</button>' +
+        '<button data-t="month">月K</button>' +
+        (allowInv ? '<button data-inv="1">正/反向</button>' : '') +
+      '</span>' +
+      (chartSrc(kind, code).length
+        ? '<span class="cp-src">K线来源：' + slinks(chartSrc(kind, code)) + '</span>' : '') +
+      '<span class="cp-meta"><span id="cpMeta"></span></span>' +
+      '<button class="cp-close">收起 ▲</button>' +
+    '</div>' +
+    '<div class="cp-chart"></div>';
+
+  cardEl.after(panel);
+  cardEl.classList.add("active");
+  const chart = echarts.init($(".cp-chart", panel));
+  openPanel = {key, el:panel, chart, cardId:cardEl.id, kind, code, name, inv:false, cur:"day"};
+
+  $(".cp-close", panel).addEventListener("click", closePanel);
+  $$(".cp-tabs button[data-t]", panel).forEach(b => b.addEventListener("click", () => {
+    if(b.disabled) return;
+    $$(".cp-tabs button[data-t]", panel).forEach(x => x.classList.remove("on"));
+    b.classList.add("on");
+    openPanel.cur = b.dataset.t;
+    drawChart();
+  }));
+  const invBtn = $(".cp-tabs button[data-inv]", panel);
+  if(invBtn) invBtn.addEventListener("click", () => {
+    openPanel.inv = !openPanel.inv;
+    invBtn.classList.toggle("on", openPanel.inv);
+    $(".cp-title", panel).textContent = openPanel.name + (openPanel.inv ? "（反向）" : "");
+    drawChart();
+  });
+
+  setTimeout(() => chart.resize(), 30);
+  drawChart();
+}
+
+async function drawChart(){
+  const P = openPanel;
+  if(!P) return;
+  const meta = $("#cpMeta", P.el);
+  meta.textContent = "加载中…";
+  try{
+    const r = await api("/api/kline?kind=" + encodeURIComponent(P.kind) +
+                        "&code=" + encodeURIComponent(P.code) +
+                        "&type=" + encodeURIComponent(P.cur));
+    let data = r.data || [];
+    if(!r.ok || !data.length){
+      meta.textContent = "";
+      P.chart.clear();
+      P.chart.setOption({title:{text:r.error || "暂无数据", left:"center", top:"middle",
+        textStyle:{color:axColor(), fontSize:13, fontWeight:"normal"}}});
+      return;
+    }
+    const digits = P.digits || digitsOf(P.cur === "min" ? data[data.length-1].v :
+                                        (data[data.length-1].c || data[data.length-1].v));
+    if(P.cur === "min"){
+      let vals = data.map(x => x.v);
+      const ref = (r.ref != null) ? r.ref : P.ref;     // 后端返回的昨收优先
+      if(P.inv) vals = vals.map(v => v ? 1/v : null);
+      drawLine(P.chart, data.map(x => x.t), vals, digits, ref, P.inv);
+      meta.innerHTML = "<span>共 <b>" + data.length + "</b> 个点</span>";
+    }else{
+      let rows = data;
+      if(P.inv) rows = rows.map(x => ({d:x.d, o:1/x.o, c:1/x.c, h:1/x.l, l:1/x.h}));
+      drawCandle(P.chart, rows, digits);
+      const last = rows[rows.length-1], first = rows[0];
+      const chg = last.c - first.o;
+      meta.innerHTML = "<span>共 <b>" + rows.length + "</b> 根</span>" +
+        "<span>" + esc(last.d) + "</span>" +
+        "<span class='" + cls(chg) + "'>收 <b>" + fmt(last.c, digits) + "</b></span>" +
+        "<span>区间 " + fmt(Math.min.apply(null, rows.map(x => x.l)), digits) +
+        " ~ " + fmt(Math.max.apply(null, rows.map(x => x.h)), digits) + "</span>";
+    }
+  }catch(e){
+    meta.textContent = "";
+    P.chart.clear();
+    P.chart.setOption({title:{text:"加载失败：" + e.message, left:"center", top:"middle",
+      textStyle:{color:upColor(), fontSize:12, fontWeight:"normal"}}});
+  }
+}
+
+function drawLine(c, labels, values, digits, ref, inv){
+  const ax = axColor(), ln = lineColor();
+  const valid = values.filter(v => v != null);
+  if(!valid.length){ c.clear(); return; }
+  const lo = Math.min.apply(null, valid), hi = Math.max.apply(null, valid);
+  const pad = (hi - lo) * 0.12 || (hi * 0.001) || 1;
+  const v0 = valid[0];
+  const color = valid[valid.length-1] >= v0 ? upColor() : downColor();
+  const series = [{
+    type:"line", data:values, showSymbol:false, smooth:false, connectNulls:true,
+    lineStyle:{width:1.5, color:color},
+    areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+      {offset:0, color:color + "40"}, {offset:1, color:color + "00"}])},
+    markLine: ref ? {silent:true, symbol:"none", data:[{yAxis:ref}],
+      lineStyle:{type:"dashed", color:ax, width:1},
+      label:{formatter:fmt(ref, digits), position:"insideEndTop", color:ax, fontSize:10}} : undefined
+  }];
+  c.setOption({
+    animation:false, grid:{left:8, right:14, top:22, bottom:8, containLabel:true},
+    tooltip:{trigger:"axis", backgroundColor:"rgba(25,32,45,.92)", borderWidth:0,
+      textStyle:{color:"#fff", fontSize:11.5},
+      formatter: p => p[0].axisValue + "<br/>" + fmt(p[0].data, digits)},
+    xAxis:{type:"category", data:labels, boundaryGap:false,
+      axisLine:{lineStyle:{color:ln}}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:10, interval:Math.max(0, Math.floor(labels.length/8)), hideOverlap:true}},
+    yAxis:{type:"value", scale:true, min:lo - pad, max:hi + pad,
+      splitLine:{lineStyle:{color:ln, type:"dashed"}},
+      axisLabel:{color:ax, fontSize:10, formatter:v => fmt(v, digits)},
+      axisLine:{show:false}, axisTick:{show:false}},
+    series: series
+  }, true);
+}
+
+function ma(rows, n){
+  const out = [];
+  for(let i = 0; i < rows.length; i++){
+    if(i < n - 1){ out.push("-"); continue; }
+    let s = 0;
+    for(let j = 0; j < n; j++) s += rows[i-j].c;
+    out.push(+(s/n).toFixed(4));
+  }
+  return out;
+}
+
+function drawCandle(c, rows, digits){
+  const ax = axColor(), ln = lineColor();
+  const dates = rows.map(r => r.d);
+  const kd = rows.map(r => [r.o, r.c, r.l, r.h]);
+  const up = upColor(), dn = downColor();
+  c.setOption({
+    animation:false,
+    grid:{left:8, right:14, top:24, bottom:44, containLabel:true},
+    tooltip:{trigger:"axis", axisPointer:{type:"cross"},
+      backgroundColor:"rgba(25,32,45,.94)", borderWidth:0, textStyle:{color:"#fff", fontSize:11.5},
+      formatter: ps => {
+        const p = ps.find(x => x.seriesType === "candlestick") || ps[0];
+        const i = p.dataIndex, r = rows[i];
+        return "<b>" + r.d + "</b><br/>开 " + fmt(r.o, digits) + "　高 " + fmt(r.h, digits) +
+               "<br/>低 " + fmt(r.l, digits) + "　收 " + fmt(r.c, digits);
+      }},
+    legend:{show:true, top:0, right:6, itemWidth:12, itemHeight:8,
+      textStyle:{color:ax, fontSize:10}, data:["MA5","MA20"]},
+    xAxis:{type:"category", data:dates, boundaryGap:true,
+      axisLine:{lineStyle:{color:ln}}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:10, hideOverlap:true}},
+    yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:ln, type:"dashed"}},
+      axisLabel:{color:ax, fontSize:10, formatter:v => fmt(v, digits)},
+      axisLine:{show:false}, axisTick:{show:false}},
+    dataZoom:[
+      {type:"inside", start:60, end:100},
+      {type:"slider", height:16, bottom:6, start:60, end:100,
+       borderColor:ln, fillerColor:"rgba(47,111,228,.13)",
+       handleStyle:{color:"#2f6fe4"}, textStyle:{color:ax, fontSize:10}}
+    ],
+    series:[
+      {name:"K线", type:"candlestick", data:kd,
+       itemStyle:{color:up, color0:dn, borderColor:up, borderColor0:dn}},
+      {name:"MA5", type:"line", data:ma(rows,5), showSymbol:false, smooth:true,
+       lineStyle:{width:1, color:"#e8a33d"}, itemStyle:{color:"#e8a33d"}},
+      {name:"MA20", type:"line", data:ma(rows,20), showSymbol:false, smooth:true,
+       lineStyle:{width:1, color:"#7a5cd6"}, itemStyle:{color:"#7a5cd6"}}
+    ]
+  }, true);
+}
+
+/* ================================================================
+   通用：卡片渲染
+================================================================ */
+function cardHtml(o){
+  const c = o.pct == null ? "flat" : cls(o.pct);
+  return '<div class="card" id="card-' + o.domId + '" data-code="' + esc(o.code) + '" data-name="' + esc(o.name) + '">' +
+    '<div class="c-name">' + esc(o.name) + (o.tag ? '<span class="tag">' + esc(o.tag) + '</span>' : '') + '</div>' +
+    '<div class="c-price ' + c + '">' + (o.price == null ? "—" : esc(o.price)) + '</div>' +
+    '<div class="c-sub"><span class="' + c + '">' + esc(o.sub1 || "") + '</span><span>' + esc(o.sub2 || "") + '</span></div>' +
+  '</div>';
+}
+let domSeq = 0;
+const domId = () => "d" + (++domSeq);
+
+function setSummary(id, html){ const el = $("#sum-" + id); if(el) el.innerHTML = html; }
+function setBody(id, html){
+  const el = $("#body-" + id);
+  if(!el) return;
+  el.innerHTML = html;
+  bindGrp(el);
+}
+
+/* ================================================================
+   二级分类（分组）折叠
+   grp(key, 标题, 右侧内容, 正文) —— 点击标题行折叠 / 展开，状态存入 localStorage
+================================================================ */
+const LS_GCLOSED = "gfd.gclosed.v1";
+function getGClosed(){ try{ return JSON.parse(localStorage.getItem(LS_GCLOSED) || "[]"); }catch(e){ return []; } }
+function setGClosed(l){ try{ localStorage.setItem(LS_GCLOSED, JSON.stringify(l)); }catch(e){} }
+function grp(key, title, right, body){
+  const closed = getGClosed().indexOf(key) >= 0;
+  return '<div class="grp' + (closed ? " closed" : "") + '" data-g="' + esc(key) + '">' +
+    '<div class="grp-title" title="点击折叠 / 展开本分类"><span class="gchev"></span>' +
+    '<span class="gt">' + title + '</span>' + (right || "") + '</div>' +
+    '<div class="grp-body">' + body + '</div></div>';
+}
+function bindGrp(root){
+  $$(".grp > .grp-title", root || document).forEach(h => {
+    if(h.dataset.bound) return;
+    h.dataset.bound = "1";
+    h.addEventListener("click", e => {
+      if(e.target.closest("a, button, input, select")) return;   // 标题行里的链接 / 控件不受影响
+      const g = h.parentElement;
+      g.classList.toggle("closed");
+      const list = getGClosed(), k = g.dataset.g, i = list.indexOf(k);
+      if(g.classList.contains("closed")){ if(i < 0) list.push(k); }
+      else if(i >= 0){ list.splice(i, 1); }
+      setGClosed(list);
+      if(!g.classList.contains("closed")) resizeChartsIn(g);
+    });
+  });
+}
+
+/* ================================================================
+   1) 汇率行情
+================================================================ */
+const FX_GROUPS = ["美元","欧元","日元","英镑","澳元","加元","瑞士法郎","新西兰元","港元","新加坡元","人民币","离岸人民币","其他货币"];
+const fxState = {group:"美元", kw:""};
+
+async function loadFx(){
+  const d = await api("/api/fx");
+  S.fx = d;
+  const items = (d.items || []).filter(x => x.ok);
+  setSummary("fx", items.slice(0, 3).map(x =>
+    '<span>' + esc(x.name.replace("美元/", "USD/")) + ' <b>' + fmt(x.price, digitsOf(x.price)) +
+    '</b> <span class="' + cls(x.pct) + '">' + pctStr(x.pct) + '</span></span>').join("") +
+    '<span>' + items.length + ' 个品种</span>');
+
+  // 美元兑换牌价条（默认 USD 兑换）
+  const usd = items.filter(x => x.base === "USD");
+  let html = grp("fx-usd", "美元兑换牌价（1 美元可兑换）",
+    '<span class="cnt">' + usd.length + ' 个</span>' + gsrc([SRC.fxLive, SRC.fxHis]),
+    '<div class="grid g-fx">' + usd.map(x => cardHtml({
+      domId: domId(), code: x.code, name: x.name.replace("美元/", "USD/"),
+      price: fmt(1, 4) + " → " + fmt(x.price, digitsOf(x.price)),
+      pct: x.pct, sub1: "涨跌 " + fmt(x.change, digitsOf(x.price)),
+      sub2: pctStr(x.pct)
+    })).join("") + '</div>');
+
+  html += grp("fx-all", "全部货币对",
+    gsrc([SRC.fxLive, SRC.fxHis]) + '<span class="sp"></span>' +
+    '<input type="search" id="fxSearch" placeholder="搜索货币对 / 代码…" value="' + esc(fxState.kw) + '" style="width:190px">',
+    '<div class="chips" id="fxChips">' +
+      ['全部'].concat(FX_GROUPS).map(g => {
+        const n = g === "全部" ? items.length : items.filter(x => x.group === g).length;
+        return '<button data-g="' + esc(g) + '"' + (g === fxState.group ? ' class="on"' : '') +
+               '>' + esc(g) + ' <span class="cnt">' + n + '</span></button>';
+      }).join("") + '</div>' +
+    '<div id="fxList" style="margin-top:10px"></div>');
+  setBody("fx", html);
+
+  $("#fxSearch").addEventListener("input", e => { fxState.kw = e.target.value.trim(); renderFxList(); });
+  $$("#fxChips button").forEach(b => b.addEventListener("click", () => {
+    fxState.group = b.dataset.g;
+    $$("#fxChips button").forEach(x => x.classList.toggle("on", x === b));
+    renderFxList();
+  }));
+  // 事件委托：美元兑换牌价 + 全部货币对 的卡片统一走这里（列表会重绘，委托最稳）
+  $("#body-fx").addEventListener("click", e => {
+    const el = e.target.closest(".card[data-code]");
+    if(!el) return;
+    const code = el.dataset.code, name = el.dataset.name;
+    const it = (S.fx.items || []).find(x => x.code === code);
+    toggleChart(el, "fx", code, name, {invert:true});
+    if(openPanel) openPanel.ref = it && it.prev ? it.prev : null;
+  });
+  renderFxList();
+}
+
+function renderFxList(){
+  const d = S.fx; if(!d) return;
+  const kw = fxState.kw.toLowerCase();
+  const all = (d.items || []).filter(x => x.ok);
+  let list = all;
+  if(kw){
+    list = all.filter(x => x.name.toLowerCase().includes(kw) ||
+      (x.base + "/" + x.quote).toLowerCase().includes(kw) || x.code.toLowerCase().includes(kw));
+  }else if(fxState.group !== "全部"){
+    list = all.filter(x => x.group === fxState.group);
+  }
+  const host = $("#fxList"); if(!host) return;
+  if(!list.length){ host.innerHTML = '<div class="empty">没有匹配的货币对</div>'; return; }
+  // 分组展示（搜索时也按组归拢）
+  const groups = fxState.group === "全部" || kw ? FX_GROUPS : [fxState.group];
+  let html = "";
+  groups.forEach(g => {
+    const sub = list.filter(x => x.group === g);
+    if(!sub.length) return;
+    html += grp("fxg-" + g, esc(g),
+      '<span class="cnt">' + sub.length + ' 个</span>' + gsrc([SRC.fxLive, SRC.fxHis]),
+      '<div class="grid g-fx">' +
+      sub.map(x => cardHtml({
+        domId: domId(), code: x.code, name: x.name,
+        price: fmt(x.price, digitsOf(x.price)), pct: x.pct,
+        sub1: (x.change > 0 ? "+" : "") + fmt(x.change, digitsOf(x.price)),
+        sub2: pctStr(x.pct)
+      })).join("") + '</div>');
+  });
+  host.innerHTML = html || '<div class="empty">没有匹配的货币对</div>';
+  bindGrp(host);
+}
+
+/* ================================================================
+   2) 世界股市
+================================================================ */
+/* 中国分组同时收录：中国内地指数、中国香港（恒生系列 / 中资企业指数）、中国台湾加权指数 */
+const WORLD_GROUPS = ["全部","中国","亚太","欧洲","美洲"];
+const worldState = {group:"全部"};
+
+/* 各区域股指的真实数据源 */
+const WORLD_SRC = {
+  "中国":     [SRC.cnIdx, SRC.hkIdx, SRC.txHis, SRC.jjhIdx],
+  "亚太":     [SRC.jjhIdx, SRC.jjhHis],
+  "欧洲":     [SRC.jjhIdx, SRC.jjhHis],
+  "美洲":     [SRC.jjhIdx, SRC.jjhHis]
+};
+
+async function loadWorld(){
+  const d = await api("/api/indices");
+  S.world = d;
+  const all = (d.cn || []).concat(d.hk || [], d.global || []).filter(x => x.ok);
+  const upN = all.filter(x => (x.pct || 0) > 0).length;
+  setSummary("world", '<span>共 <b>' + all.length + '</b> 个指数</span>' +
+    '<span class="up">涨 <b>' + upN + '</b></span><span class="down">跌 <b>' + (all.length - upN) + '</b></span>');
+
+  let html = '<div class="grp-title plain"><span>区域筛选</span>' +
+    '<span class="cnt">点击卡片查看日K / 月K</span>' +
+    gsrc([SRC.cnIdx, SRC.hkIdx, SRC.jjhIdx, SRC.txHis]) + '</div>' +
+    '<div class="chips" id="worldChips">' + WORLD_GROUPS.map(g =>
+      '<button data-g="' + g + '"' + (g === worldState.group ? ' class="on"' : '') + '>' + g + '</button>'
+    ).join("") + '</div><div id="worldList" style="margin-top:10px"></div>';
+  setBody("world", html);
+  $$("#worldChips button").forEach(b => b.addEventListener("click", () => {
+    worldState.group = b.dataset.g;
+    $$("#worldChips button").forEach(x => x.classList.toggle("on", x === b));
+    renderWorld();
+  }));
+  renderWorld();
+}
+
+function renderWorld(){
+  const d = S.world; if(!d) return;
+  const all = (d.cn || []).concat(d.hk || [], d.global || []);
+  const g = worldState.group;
+  const list = g === "全部" ? all : all.filter(x => x.region === g);
+  const host = $("#worldList"); if(!host) return;
+  if(!list.length){ host.innerHTML = '<div class="empty">该区域暂无数据</div>'; return; }
+  const groups = g === "全部" ? ["中国","亚太","欧洲","美洲"] : [g];
+  let html = "";
+  groups.forEach(rg => {
+    const sub = list.filter(x => x.region === rg);
+    if(!sub.length) return;
+    html += grp("wld-" + rg, esc(rg),
+      '<span class="cnt">' + sub.length + ' 个</span>' +
+      gsrc(WORLD_SRC[rg] || [SRC.jjhIdx]),
+      '<div class="grid g-idx">' +
+      sub.map(x => cardHtml({
+        domId: domId(), code: x.code, name: x.name, tag: x.country,
+        price: x.ok ? fmt(x.price, x.digits || 2) : "—", pct: x.pct,
+        sub1: x.ok ? (x.change > 0 ? "+" : "") + fmt(x.change, x.digits || 2) : "暂无数据",
+        sub2: x.ok ? pctStr(x.pct) : ""
+      })).join("") + '</div>');
+  });
+  host.innerHTML = html;
+  bindGrp(host);
+  $$(".card[data-code]", host).forEach(el => {
+    if(el.querySelector(".c-price").textContent.trim() === "—") return;
+    el.addEventListener("click", () => toggleChart(el, "index", el.dataset.code, el.dataset.name));
+  });
+}
+
+/* ================================================================
+   3) 美股三大指数 + 指数期货
+================================================================ */
+async function loadUs(){
+  const d = await api("/api/us");
+  S.us = d;
+  setSummary("us", (d.idx || []).filter(x => x.ok).slice(0, 3).map(x =>
+    '<span>' + esc(x.sym) + ' <b>' + fmt(x.price, x.digits || 2) + '</b> <span class="' + cls(x.pct) +
+    '">' + pctStr(x.pct) + '</span></span>').join(""));
+  let html = grp("us-idx", "美股三大指数",
+    '<span class="cnt">点击卡片查看日K / 月K</span>' + gsrc([SRC.jjhIdx, SRC.sinaUS]),
+    '<div class="grid g-idx">' + (d.idx || []).map(x => cardHtml({
+      domId: domId(), code: x.code, name: x.name, tag: x.sym,
+      price: x.ok ? fmt(x.price, x.digits || 2) : "—", pct: x.pct,
+      sub1: x.ok ? (x.change > 0 ? "+" : "") + fmt(x.change, x.digits || 2) : "暂无数据",
+      sub2: x.ok ? pctStr(x.pct) : ""
+    })).join("") + '</div>');
+  html += grp("us-fut", "指数期货（CME 连续合约）",
+    '<span class="cnt">点击卡片查看日K / 月K</span>' + gsrc([SRC.sinaFut, SRC.sinaFutH]),
+    '<div class="grid g-idx">' + (d.fut || []).map(x => cardHtml({
+      domId: domId(), code: x.symbol, name: x.name, tag: "期货",
+      price: x.ok ? fmt(x.price, digitsOf(x.price)) : "—", pct: x.pct,
+      sub1: x.ok ? (x.change > 0 ? "+" : "") + fmt(x.change, digitsOf(x.price)) : "暂无数据",
+      sub2: x.ok ? pctStr(x.pct) : ""
+    })).join("") + '</div>');
+  setBody("us", html);
+  $$("#body-us .card[data-code]").forEach(el => {
+    if(el.querySelector(".c-price").textContent.trim() === "—") return;
+    const code = el.dataset.code;
+    el.addEventListener("click", () => toggleChart(el, "futures", code, el.dataset.name));
+  });
+  // 指数卡片用 index 类型（金投网 JO_ 代码）
+  $$("#body-us .card[data-code^='JO_']").forEach(el => {
+    const code = el.dataset.code;
+    el.replaceWith(el.cloneNode(true));
+  });
+  $$("#body-us .card[data-code^='JO_']").forEach(el => {
+    el.addEventListener("click", () => toggleChart(el, "index", el.dataset.code, el.dataset.name));
+  });
+}
+
+/* ================================================================
+   4) 虚拟币
+================================================================ */
+async function loadCrypto(){
+  const d = await api("/api/crypto");
+  S.crypto = d;
+  const items = (d.items || []).filter(x => x.ok);
+  setSummary("crypto", items.slice(0, 3).map(x =>
+    '<span>' + esc(x.disp) + ' <b>' + fmt(x.price, digitsOf(x.price)) + '</b> <span class="' + cls(x.pct) +
+    '">' + pctStr(x.pct) + '</span></span>').join("") + '<span>' + items.length + ' 个币种</span>');
+  const html = grp("coin-main", "主流币种",
+    '<span class="cnt">点击卡片查看分时 / 日K / 月K</span>' + gsrc([SRC.sinaCry, SRC.gate]),
+    '<div class="grid g-coin">' +
+    (d.items || []).map(x => cardHtml({
+      domId: domId(), code: x.symbol, name: x.disp + " " + x.name, tag: "USD",
+      price: x.ok ? fmt(x.price, digitsOf(x.price)) : "—", pct: x.pct,
+      sub1: x.ok ? (x.change > 0 ? "+" : "") + fmt(x.change, digitsOf(x.price)) : "暂无数据",
+      sub2: x.ok ? pctStr(x.pct) : ""
+    })).join("") + '</div>');
+  setBody("crypto", html);
+  $$("#body-crypto .card[data-code]").forEach(el => {
+    if(el.querySelector(".c-price").textContent.trim() === "—") return;
+    el.addEventListener("click", () => {
+      toggleChart(el, "crypto", el.dataset.code, el.dataset.name);
+      const it = (S.crypto.items || []).find(x => x.symbol === el.dataset.code);
+      if(openPanel) openPanel.ref = (it && it.prev) ? it.prev : null;
+    });
+  });
+}
+
+/* ================================================================
+   5) 国际期货
+================================================================ */
+async function loadFutures(){
+  const d = await api("/api/futures");
+  S.fut = d;
+  const items = (d.items || []).filter(x => x.ok);
+  const gold = items.find(x => x.symbol === "GC"), oil = items.find(x => x.symbol === "CL");
+  setSummary("fut", (gold ? '<span>黄金 <b>' + fmt(gold.price, 2) + '</b> <span class="' + cls(gold.pct) +
+    '">' + pctStr(gold.pct) + '</span></span>' : "") +
+    (oil ? '<span>WTI <b>' + fmt(oil.price, 2) + '</b> <span class="' + cls(oil.pct) + '">' +
+    pctStr(oil.pct) + '</span></span>' : "") + '<span>' + items.length + ' 个品种</span>');
+  const groups = ["贵金属","能源","有色金属","农产品","数字货币"];
+  let html = "";
+  groups.forEach(g => {
+    const sub = (d.items || []).filter(x => x.group === g);
+    if(!sub.length) return;
+    html += grp("fut-" + g, esc(g),
+      '<span class="cnt">' + sub.filter(x => x.ok).length + ' 个</span>' +
+      gsrc([SRC.sinaFut, SRC.sinaFutH]),
+      '<div class="grid g-fut">' + sub.map(x => cardHtml({
+        domId: domId(), code: x.symbol, name: x.name, tag: x.unit,
+        price: x.ok ? fmt(x.price, digitsOf(x.price)) : "—", pct: x.pct,
+        sub1: x.ok ? (x.change > 0 ? "+" : "") + fmt(x.change, digitsOf(x.price)) : "暂无数据",
+        sub2: x.ok ? pctStr(x.pct) : ""
+      })).join("") + '</div>');
+  });
+  setBody("fut", html);
+  $$("#body-fut .card[data-code]").forEach(el => {
+    if(el.querySelector(".c-price").textContent.trim() === "—") return;
+    el.addEventListener("click", () => toggleChart(el, "futures", el.dataset.code, el.dataset.name));
+  });
+}
+
+/* ================================================================
+   6) 人民币汇率指数
+================================================================ */
+async function loadRmb(){
+  const d = await api("/api/rmbidx");
+  S.rmb = d;
+  setSummary("rmb", (d.current || []).map(c =>
+    '<span>' + esc(c.label.replace(/ .*/, "")) + ' <b>' + fmt(c.value, 2) + '</b></span>').join(""));
+  let html = grp("rmb-3", "三大人民币汇率指数（CFETS / BIS / SDR）",
+    '<span class="cnt">数据日期 ' + esc(d.asOf || "—") + '</span>' + gsrc([SRC.rmb, SRC.rmbHis]),
+    '<div class="stats">' +
+    (d.current || []).map(c => '<div class="stat"><div class="s-k">' + esc(c.label) + '</div>' +
+      '<div class="s-v">' + fmt(c.value, 2) + '</div>' +
+      '<div class="s-d">较上期 <span class="' + cls(c.bp) + '">' + bpStr(c.bp) + '</span></div></div>'
+    ).join("") + '</div>');
+  html += grp("rmb-his", "指数历史走势",
+    '<span class="cnt">CFETS / BIS / SDR 三条曲线</span>' + gsrc([SRC.rmbHis]),
+    '<div class="chart-box" id="rmbChart" style="margin-top:6px"></div>');
+  if(d.error) html += '<div class="warn">' + esc(d.error) + '</div>';
+  setBody("rmb", html);
+  const chart = echarts.init($("#rmbChart"));
+  const names = Object.keys(d.series || {}).filter(k => (d.series[k] || []).length);
+  if(!names.length){
+    chart.setOption({title:{text:"暂无历史数据", left:"center", top:"middle",
+      textStyle:{color:axColor(), fontSize:13, fontWeight:"normal"}}});
+  }else{
+    const ax = axColor(), ln = lineColor();
+    let xAxis = [], map = {};
+    names.forEach(n => (d.series[n] || []).forEach(p => {
+      if(!map[p[0]]){ map[p[0]] = 1; xAxis.push(p[0]); }
+    }));
+    xAxis.sort();
+    const idxOf = {}; xAxis.forEach((x, i) => idxOf[x] = i);
+    const series = names.map(n => {
+      const arr = new Array(xAxis.length).fill(null);
+      (d.series[n] || []).forEach(p => { arr[idxOf[p[0]]] = p[1]; });
+      return {name:n, type:"line", data:arr, showSymbol:false, smooth:true, connectNulls:true,
+              lineStyle:{width:1.5}};
+    });
+    chart.setOption({
+      animation:false, grid:{left:8, right:16, top:34, bottom:8, containLabel:true},
+      legend:{top:0, left:"center", type:"scroll", itemWidth:14, itemGap:10,
+        textStyle:{color:ax, fontSize:11}},
+      tooltip:{trigger:"axis", backgroundColor:"rgba(25,32,45,.94)", borderWidth:0,
+        textStyle:{color:"#fff", fontSize:11.5}},
+      xAxis:{type:"category", data:xAxis, boundaryGap:false, axisLine:{lineStyle:{color:ln}},
+        axisTick:{show:false}, axisLabel:{color:ax, fontSize:10, hideOverlap:true}},
+      yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:ln, type:"dashed"}},
+        axisLine:{show:false}, axisTick:{show:false}, axisLabel:{color:ax, fontSize:10}},
+      series
+    });
+  }
+  bindResize(chart, "#rmbChart");
+}
+
+/* ================================================================
+   7) 国债收益率
+================================================================ */
+async function loadBonds(){
+  const d = await api("/api/bonds");
+  S.bond = d;
+  const us10 = (d.us || []).find(x => x.code === "globalbd_us10yt");
+  const cn10 = (d.cn || []).find(x => x.code === "globalbd_cn10yt");
+  setSummary("bond", (us10 && us10.ok ? '<span>美10年 <b>' + fmt(us10.yield, 3) + '%</b> <span class="' +
+    cls(us10.bp) + '">' + bpStr(us10.bp) + '</span></span>' : "") +
+    (cn10 && cn10.ok ? '<span>中10年 <b>' + fmt(cn10.yield, 3) + '%</b> <span class="' +
+    cls(cn10.bp) + '">' + bpStr(cn10.bp) + '</span></span>' : ""));
+  let html = '<div class="two">' +
+    grp("bond-curve-us", "美国国债收益率曲线",
+      '<span class="cnt">点击卡片看分时 / 日K / 月K</span>' + gsrc([SRC.bondLive, SRC.bondHis]),
+      '<div class="chart-box" id="bondChartUs" style="height:230px"></div>') +
+    grp("bond-curve-cn", "中国国债收益率曲线",
+      '<span class="cnt">点击卡片看分时 / 日K / 月K</span>' + gsrc([SRC.bondLive, SRC.bondHis]),
+      '<div class="chart-box" id="bondChartCn" style="height:230px"></div>') +
+    '</div>';
+  html += bondTable("bond-us", "美国国债（全期限）", d.us || [], [SRC.bondLive, SRC.bondHis]);
+  html += bondTable("bond-cn", "中国国债（全期限）", d.cn || [], [SRC.bondLive, SRC.bondHis]);
+  html += bondTable("bond-other", "主要国家 10 年期国债收益率", d.other || [], [SRC.bondLive], true);
+  if(d.error) html += '<div class="warn">' + esc(d.error) + '</div>';
+  setBody("bond", html);
+  drawCurve("bondChartUs", (d.us || []).filter(x => x.ok));
+  drawCurve("bondChartCn", (d.cn || []).filter(x => x.ok));
+  $$("#body-bond .card[data-bcode]").forEach(el => {
+    el.addEventListener("click", () => toggleChart(el, "bond", el.dataset.bcode, el.dataset.bname));
+  });
+}
+
+/* 卡片主标题：byCountry=true 时（各国 10 年期）以「国家/地区」为主，「10年期」作小标签 */
+function bondName(x, byCountry){
+  if(!byCountry) return esc(x.label || "");
+  const nm = x.country || x.label || "";
+  const tag = (x.label && x.country) ? '<span class="tag">' + esc(x.label) + '</span>' : "";
+  return '<span class="cty">' + esc(nm) + '</span>' + tag;
+}
+
+function bondTable(key, title, rows, srcs, byCountry){
+  const okN = rows.filter(x => x.ok).length;
+  const cntTxt = byCountry
+    ? okN + ' / ' + rows.length + ' 个国家 · 单位：%'
+    : okN + ' / ' + rows.length + ' 有数据';
+  const colW = byCountry ? 150 : 158;
+  return grp(key, esc(title),
+    '<span class="cnt">' + cntTxt + '</span>' + gsrc(srcs),
+    '<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(' + colW + 'px,1fr))">' +
+    rows.map(x => x.ok
+      ? '<div class="card" data-bcode="' + esc(x.code) + '" data-bname="' + esc((x.country || "") + " " + (x.label || "")) + '"' +
+          ' title="' + esc((x.country || "") + (x.label ? " " + x.label : "") + "：" + fmt(x.yield, 3) + "%") + '">' +
+          '<div class="c-name">' + bondName(x, byCountry) + '</div>' +
+          '<div class="c-price ' + cls(x.bp) + '">' + fmt(x.yield, 3) + '%</div>' +
+          '<div class="c-sub"><span class="' + cls(x.bp) + '">' + bpStr(x.bp) + '</span>' +
+          '<span>' + esc(x.date || "") + '</span></div></div>'
+      : '<div class="card" style="opacity:.55;cursor:default">' +
+          '<div class="c-name">' + bondName(x, byCountry) + '</div>' +
+          '<div class="c-price" style="font-size:14px;color:var(--muted)">暂无数据</div>' +
+          '<div class="c-sub"><span>—</span><span></span></div></div>'
+    ).join("") + '</div>');
+}
+
+function drawCurve(elId, rows){
+  const el = $("#" + elId); if(!el) return;
+  const chart = echarts.init(el);
+  if(!rows.length){
+    chart.setOption({title:{text:"暂无数据", left:"center", top:"middle",
+      textStyle:{color:axColor(), fontSize:12, fontWeight:"normal"}}});
+    bindResize(chart, "#" + elId); return;
+  }
+  const ax = axColor(), ln = lineColor();
+  chart.setOption({
+    animation:false, grid:{left:6, right:14, top:18, bottom:6, containLabel:true},
+    tooltip:{trigger:"axis", backgroundColor:"rgba(25,32,45,.94)", borderWidth:0,
+      textStyle:{color:"#fff", fontSize:11.5},
+      formatter: p => p[0].axisValue + " 年期<br/>" + fmt(p[0].data, 3) + "%"},
+    xAxis:{type:"category", data:rows.map(x => x.label), axisLine:{lineStyle:{color:ln}},
+      axisTick:{show:false}, axisLabel:{color:ax, fontSize:10, hideOverlap:true, interval:"auto"}},
+    yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:ln, type:"dashed"}},
+      axisLine:{show:false}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:10, formatter:v => v.toFixed(2) + "%"}},
+    series:[{type:"line", data:rows.map(x => x.yield), smooth:true, symbolSize:5,
+      itemStyle:{color:"#2f6fe4"}, lineStyle:{width:2, color:"#2f6fe4"},
+      areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[
+        {offset:0, color:"rgba(47,111,228,.28)"}, {offset:1, color:"rgba(47,111,228,0)"}])}}]
+  });
+  bindResize(chart, "#" + elId);
+}
+
+/* ================================================================
+   8) 美国国债数据（表格 + 分页 + Excel）
+================================================================ */
+const debtState = {page:1, size:20, span:260,
+  types:{total:true, public:true, intragov:true}};
+/* 可展示的数据类型（图例 / 按钮均可切换） */
+const DEBT_TYPE = [["total","国债总额","#2f6fe4"],
+                   ["public","公众持有","#e8a33d"],
+                   ["intragov","政府内部持有","#17a673"]];
+/* 图表可选时间范围 */
+const DEBT_SPAN = [["近 3 个月",65],["近 1 年",260],["近 3 年",780],
+                   ["近 5 年",1300],["近 10 年",2600]];
+
+/* 金额变化：美元 -> 亿美元（带符号） */
+function debtDelta(v){
+  if(v == null || isNaN(v)) return "—";
+  const y = v / 1e8;
+  return (y > 0 ? "+" : "") + y.toLocaleString("zh-CN", {minimumFractionDigits:1, maximumFractionDigits:1}) + " 亿";
+}
+function cmpCard(k, v, p, date){
+  return '<div class="c"><div class="c-k">' + k + '</div>' +
+    '<div class="c-v ' + (v == null ? "" : cls(v)) + '">' + debtDelta(v) + '</div>' +
+    '<div class="c-d">' + (p == null ? "暂无对比数据" : pctStr(p)) +
+    (date ? ' · 参照日 ' + esc(date) : '') + '</div></div>';
+}
+
+async function loadDebt(){
+  const d = await api("/api/debt?page=" + debtState.page + "&size=" + debtState.size);
+  S.debt = d;
+  const cp = d.compare || {};
+  setSummary("debt", d.latest ? '<span>最新 <b>' + esc(d.latest.date) + '</b></span>' +
+    '<span>总额 <b>' + bigN(d.latest.total) + '</b></span>' +
+    (cp.dod == null ? "" : '<span class="' + cls(cp.dod) + '">较上日 ' + debtDelta(cp.dod) + '</span>') +
+    '<span>共 <b>' + d.total + '</b> 条</span>' : "");
+  if(!d.ok){
+    setBody("debt", '<div class="warn">' + esc(d.error || "数据获取失败") + '</div>');
+    return;
+  }
+  /* ① 数据比较：相较上一交易日 / 上月同期 / 上年同期 —— 排在明细数据表之前 */
+  let html = '<div class="cmp">' +
+    '<div class="c"><div class="c-k">国债总额（最新）</div>' +
+      '<div class="c-v">' + bigN(d.latest.total) + ' 美元</div>' +
+      '<div class="c-d">' + esc(d.latest.date) + ' · 公众持有 ' + bigN(d.latest.public) +
+      ' · 政府内部 ' + bigN(d.latest.intragov) + '</div></div>' +
+    cmpCard("较上一交易日", cp.dod, cp.dodP, cp.dodDate) +
+    cmpCard("较上月同期", cp.mom, cp.momP, cp.momDate) +
+    cmpCard("较上年同期", cp.yoy, cp.yoyP, cp.yoyDate) +
+    '</div>';
+
+  /* ② 走势图：总额 / 公众持有 / 政府内部持有（数据类型与时间范围均可切换）—— 同样在明细表之前 */
+  html += grp("debt-chart", "国债余额走势与持有结构",
+    '<span class="cnt">单位：万亿美元 · 可切换数据类型 / 时间范围</span>' + gsrc([SRC.debt]),
+    '<div class="plot-tools" id="debtTypes"><span class="tlab">数据类型</span>' +
+      DEBT_TYPE.map(t => '<button data-t="' + t[0] + '"' +
+        (debtState.types[t[0]] ? ' class="on"' : '') + '>' + t[1] + '</button>').join("") +
+    '</div>' +
+    '<div class="plot-tools" id="debtSpans"><span class="tlab">时间范围</span>' +
+      DEBT_SPAN.map(s => '<button data-n="' + s[1] + '"' +
+        (s[1] === debtState.span ? ' class="on"' : '') + '>' + s[0] + '</button>').join("") +
+    '</div>' +
+    '<div class="chart-box" id="debtChart" style="height:300px"></div>');
+
+  /* ③ 逐日明细表：全量 · 分页 · Excel 下载（放在最后） */
+  const rows = d.rows || [];
+  let tbody = "";
+  rows.forEach((r, i) => {
+    tbody += '<tr><td>' + ((d.page - 1) * d.size + i + 1) + '</td>' +
+      '<td>' + esc(r.date) + '</td>' +
+      '<td class="r">' + fmt(r.total, 2) + '</td>' +
+      '<td class="r">' + fmt(r.public, 2) + '</td>' +
+      '<td class="r">' + fmt(r.intragov, 2) + '</td>' +
+      '<td class="r"><b>' + (r.total != null ? (r.total / 1e12).toFixed(4) : "—") + '</b></td>' +
+      '<td class="r ' + (r.dodP == null ? "" : cls(r.dodP)) + '">' + debtDelta(r.dod) + '</td>' +
+      '<td class="r ' + (r.momP == null ? "" : cls(r.momP)) + '">' + debtDelta(r.mom) + '</td>' +
+      '<td class="r ' + (r.yoyP == null ? "" : cls(r.yoyP)) + '">' + debtDelta(r.yoy) + '</td></tr>';
+  });
+  html += grp("debt-table", "逐日明细数据（Debt to the Penny，1993 年至今）",
+    '<span class="cnt">共 ' + d.total + ' 条 · 每页 ' + d.size + ' 条</span>' + gsrc([SRC.debt]) +
+    '<span class="sp"></span><button class="btn" id="debtXlsx">⤓ 下载全部 Excel</button>',
+    '<div class="tbl-wrap"><table><thead><tr>' +
+      '<th style="width:52px">#</th><th>日期</th><th class="r">国债总额（美元）</th>' +
+      '<th class="r">公众持有（美元）</th><th class="r">政府内部持有（美元）</th>' +
+      '<th class="r">总额（万亿）</th><th class="r">较上日</th>' +
+      '<th class="r">较上月同期</th><th class="r">较上年同期</th>' +
+    '</tr></thead><tbody>' + tbody + '</tbody></table></div>' +
+    '<div class="pager">' +
+      '<button class="pg-btn" id="dpFirst" ' + (d.page <= 1 ? "disabled" : "") + '>« 首页</button>' +
+      '<button class="pg-btn" id="dpPrev" ' + (d.page <= 1 ? "disabled" : "") + '>‹ 上一页</button>' +
+      '<span>第 <b>' + d.page + '</b> / ' + d.pages + ' 页</span>' +
+      '<button class="pg-btn" id="dpNext" ' + (d.page >= d.pages ? "disabled" : "") + '>下一页 ›</button>' +
+      '<button class="pg-btn" id="dpLast" ' + (d.page >= d.pages ? "disabled" : "") + '>末页 »</button>' +
+      '<span class="sp">每页显示' +
+        '<select id="dpSize">' + [10, 20, 100].map(n =>
+          '<option value="' + n + '"' + (n === d.size ? " selected" : "") + '>' + n + ' 条</option>').join("") +
+        '</select><span style="color:var(--muted)">数据区间 ' + esc(d.oldest || "") + ' ~ ' +
+        esc(d.latest ? d.latest.date : "") + '</span>' +
+      '</span></div>');
+  setBody("debt", html);
+
+  $("#debtXlsx").addEventListener("click", () => {
+    const b = $("#debtXlsx"); b.textContent = "正在生成…"; b.disabled = true;
+    window.location.href = "/api/debt/export";
+    setTimeout(() => { b.textContent = "⤓ 下载全部 Excel"; b.disabled = false; }, 2600);
+  });
+  const go = (p) => { debtState.page = p; loadDebt(); };
+  $("#dpFirst").addEventListener("click", () => go(1));
+  $("#dpPrev").addEventListener("click", () => go(d.page - 1));
+  $("#dpNext").addEventListener("click", () => go(d.page + 1));
+  $("#dpLast").addEventListener("click", () => go(d.pages));
+  $("#dpSize").addEventListener("change", e => { debtState.size = +e.target.value; debtState.page = 1; loadDebt(); });
+  // 数据类型切换（总额 / 公众持有 / 政府内部持有）
+  $$("#debtTypes button").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.t;
+    const on = Object.keys(debtState.types).filter(x => debtState.types[x]);
+    if(debtState.types[k] && on.length === 1) return;      // 至少保留一条曲线
+    debtState.types[k] = !debtState.types[k];
+    b.classList.toggle("on", debtState.types[k]);
+    drawDebtChart();
+  }));
+  // 时间范围切换
+  $$("#debtSpans button").forEach(b => b.addEventListener("click", () => {
+    debtState.span = +b.dataset.n;
+    $$("#debtSpans button").forEach(x => x.classList.toggle("on", x === b));
+    drawDebtChart();
+  }));
+  drawDebtChart();
+}
+
+/* 国债走势图：总额 / 公众持有 / 政府内部持有 三条曲线，可切数据类型与时间范围 */
+function drawDebtChart(){
+  const el = $("#debtChart"); if(!el || !S.debt) return;
+  let chart = echarts.getInstanceByDom(el);
+  if(!chart){ chart = echarts.init(el); bindResize(chart, "#debtChart"); }
+  const ax = axColor(), ln = lineColor();
+  const all = S.debt.series || [];
+  const rows = debtState.span > 0 ? all.slice(-debtState.span) : all;
+  if(!rows.length){
+    chart.clear();
+    chart.setOption({title:{text:"暂无走势数据", left:"center", top:"middle",
+      textStyle:{color:ax, fontSize:13, fontWeight:"normal"}}});
+    return;
+  }
+  const T = 1e12;
+  const chosen = DEBT_TYPE.filter(t => debtState.types[t[0]]);
+  const series = chosen.map(t => ({
+    name: t[1], type: "line", showSymbol: false, smooth: true, connectNulls: true,
+    data: rows.map(r => (r[t[0]] == null ? null : +(r[t[0]] / T).toFixed(4))),
+    itemStyle: {color: t[2]},
+    lineStyle: {width: t[0] === "total" ? 2.4 : 1.7, color: t[2]},
+    emphasis: {focus: "series"},
+    areaStyle: t[0] === "total" ? {color: new echarts.graphic.LinearGradient(0,0,0,1,[
+      {offset:0, color:"rgba(47,111,228,.20)"}, {offset:1, color:"rgba(47,111,228,0)"}])} : null
+  }));
+  chart.setOption({
+    animation:false,
+    grid:{left:8, right:18, top:34, bottom:8, containLabel:true},
+    legend:{top:0, left:"center", type:"scroll", itemWidth:16, itemGap:14,
+      textStyle:{color:ax, fontSize:11.5}},
+    tooltip:{trigger:"axis", backgroundColor:"rgba(25,32,45,.94)", borderWidth:0,
+      textStyle:{color:"#fff", fontSize:11.5},
+      formatter: p => {
+        let s = '<b>' + p[0].axisValue + '</b>';
+        p.forEach(x => {
+          s += '<br/>' + x.marker + x.seriesName + '：' +
+            (x.data == null ? "—" : x.data.toFixed(4) + ' 万亿美元');
+        });
+        return s;
+      }},
+    xAxis:{type:"category", data:rows.map(r => r.date), boundaryGap:false,
+      axisLine:{lineStyle:{color:ln}}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:10, hideOverlap:true}},
+    yAxis:{type:"value", scale:true, splitLine:{lineStyle:{color:ln, type:"dashed"}},
+      axisLine:{show:false}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:10, formatter:v => v.toFixed(1) + "T"}},
+    dataZoom:[{type:"inside", start:0, end:100}],
+    series
+  }, true);
+}
+
+/* ================================================================
+   9) 各国央行利率（金投网）
+================================================================ */
+async function loadRates(){
+  const d = await api("/api/rates");
+  S.rates = d;
+  const items = (d.items || []).filter(x => x.ok);
+  const top = items.slice(0, 4);
+  setSummary("rate", top.map(x => '<span>' + esc(x.country) + ' <b>' + fmt(x.cur, 2) + '%</b></span>').join("") +
+    '<span>共 ' + items.length + ' 个国家/地区</span>');
+  if(!d.ok){
+    setBody("rate", '<div class="warn">' + esc(d.error || "央行利率数据获取失败") + '</div>');
+    return;
+  }
+  let html = grp("rate-tbl", "各国央行基准利率",
+    '<span class="cnt">主要国家排前 · 含当前值 / 前次值 / 变动 / 公布日期</span>' + gsrc([SRC.rate]),
+    '<div class="tbl-wrap" style="max-height:520px"><table><thead><tr>' +
+      '<th style="width:52px">#</th><th>国家 / 地区</th><th>利率名称</th>' +
+      '<th class="r">当前值</th><th class="r">前次值</th><th class="r">变动</th>' +
+      '<th class="r">公布日期</th></tr></thead><tbody>' +
+      (d.items || []).map((x, i) =>
+        '<tr><td>' + (i + 1) + '</td>' +
+        '<td><b>' + esc(x.country) + '</b></td>' +
+        '<td style="color:var(--text2)">' + esc(x.name) + '</td>' +
+        '<td class="r"><b>' + (x.cur == null ? "—" : fmt(x.cur, 2) + "%") + '</b></td>' +
+        '<td class="r">' + (x.prev == null ? "—" : fmt(x.prev, 2) + "%") + '</td>' +
+        '<td class="r ' + cls(x.bp) + '">' + esc(x.bpText) + '</td>' +
+        '<td class="r" style="color:var(--muted)">' + esc(x.date || "—") + '</td></tr>').join("") +
+      '</tbody></table></div>');
+  html += grp("rate-cmp", "主要国家利率水平对比",
+    '<span class="cnt">单位：% · 前 18 个主要国家 / 地区 · 可滚轮缩放</span>' + gsrc([SRC.rate]),
+    '<div class="chart-box" id="rateBars" style="height:' +
+      Math.max(300, Math.min(items.length, 18) * 24 + 60) + 'px"></div>');
+  if(d.error) html += '<div class="warn">' + esc(d.error) + '</div>';
+  setBody("rate", html);
+  drawRateBars();
+}
+
+/* 主要国家利率水平对比（横向柱状图） */
+function rateColor(v){
+  if(v == null) return "#8a94a6";
+  if(v >= 5) return "#d6353b";
+  if(v >= 3) return "#e8a33d";
+  if(v >= 1) return "#2f6fe4";
+  if(v > 0)  return "#17a673";
+  return "#8a94a6";
+}
+function drawRateBars(){
+  const el = $("#rateBars"); if(!el) return;
+  let chart = echarts.getInstanceByDom(el);
+  if(!chart){ chart = echarts.init(el); bindResize(chart, "#rateBars"); }
+  const ax = axColor(), ln = lineColor();
+  const show = ((S.rates || {}).items || []).filter(x => x.ok).slice(0, 18);
+  if(!show.length){
+    chart.clear();
+    chart.setOption({title:{text:"暂无利率数据", left:"center", top:"middle",
+      textStyle:{color:ax, fontSize:13, fontWeight:"normal"}}});
+    return;
+  }
+  chart.setOption({
+    animation:true,
+    grid:{left:8, right:70, top:14, bottom:8, containLabel:true},
+    tooltip:{trigger:"item", backgroundColor:"rgba(25,32,45,.94)", borderWidth:0,
+      textStyle:{color:"#fff", fontSize:11.5},
+      formatter: p => {
+        const x = show[p.dataIndex];
+        return '<b>' + esc(x.country) + '</b><br/>' + esc(x.name || "基准利率") +
+          '：' + fmt(x.cur, 2) + '%' +
+          (x.prev == null ? '' : '<br/>前值：' + fmt(x.prev, 2) + '%') +
+          '<br/>变动：' + esc(x.bpText || "—") + (x.date ? '<br/>公布：' + esc(x.date) : '');
+      }},
+    xAxis:{type:"value", splitLine:{lineStyle:{color:ln, type:"dashed"}},
+      axisLine:{show:false}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:10, formatter:"{value}%"}},
+    yAxis:{type:"category", inverse:true, data:show.map(x => x.country),
+      axisLine:{lineStyle:{color:ln}}, axisTick:{show:false},
+      axisLabel:{color:ax, fontSize:11}},
+    series:[{
+      type:"bar", barMaxWidth:16,
+      data: show.map(x => ({value: x.cur, itemStyle:{color: rateColor(x.cur)}})),
+      label:{show:true, position:"right", color:ax, fontSize:11,
+        formatter: p => p.value.toFixed(2) + "%"}
+    }],
+    dataZoom:[{type:"inside", yAxisIndex:0, start:0, end:100}]
+  }, true);
+}
+
+/* ================================================================
+   窗口自适应
+================================================================ */
+function bindResize(chart, sel){
+  const fn = () => { try{ chart.resize(); }catch(e){} };
+  window.addEventListener("resize", fn);
+  const sec = $(sel) && $(sel).closest(".sec");
+  if(sec){
+    const head = $(".sec-head", sec);
+    if(head) head.addEventListener("click", () => setTimeout(fn, 220));
+  }
+}
+window.addEventListener("resize", () => { if(openPanel && openPanel.chart) openPanel.chart.resize(); });
+
+/* ================================================================
+   主题
+================================================================ */
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  $("#themeBtn").textContent = t === "dark" ? "浅色" : "深色";
+  localStorage.setItem(LS_THEME, t);
+  // 重绘图表
+  if(openPanel) drawChart();
+  if(S.rmb) { const c = echarts.getInstanceByDom($("#rmbChart")); }
+  reThemeCharts();
+}
+function reThemeCharts(){
+  setTimeout(() => {
+    ["#bondChartUs", "#bondChartCn", "#debtChart", "#rmbChart"].forEach(sel => {
+      const el = $(sel);
+      if(!el) return;
+      const c = echarts.getInstanceByDom(el);
+      if(!c) return;
+      const ax = axColor(), ln = lineColor();
+      c.setOption({xAxis:{axisLabel:{color:ax}, axisLine:{lineStyle:{color:ln}}},
+                   yAxis:{axisLabel:{color:ax}, splitLine:{lineStyle:{color:ln, type:"dashed"}}}});
+    });
+  }, 60);
+}
+
+/* ================================================================
+   加载全部
+================================================================ */
+const LOADERS = {
+  fx: loadFx, world: loadWorld, us: loadUs, crypto: loadCrypto, fut: loadFutures,
+  rmb: loadRmb, bond: loadBonds, debt: loadDebt, rate: loadRates
+};
+
+async function loadAll(showStatus){
+  if(showStatus) $("#status").textContent = "正在加载…";
+  const t0 = Date.now();
+  const ids = getOrder();
+  const results = await Promise.allSettled(ids.map(id => LOADERS[id] ? LOADERS[id]() : null));
+  let bad = 0;
+  results.forEach((r, i) => {
+    if(r.status === "rejected"){
+      bad++;
+      const id = ids[i];
+      const b = $("#body-" + id);
+      if(b) b.innerHTML = '<div class="warn">加载失败：' + esc(r.reason && r.reason.message || r.reason) + '</div>';
+    }
+  });
+  $("#status").textContent = (bad ? "部分板块失败 " + bad + " 个 · " : "") +
+    "更新于 " + new Date().toLocaleTimeString("zh-CN") + " · 耗时 " + ((Date.now() - t0) / 1000).toFixed(1) + "s";
+}
+
+/* ================================================================
+   启动
+================================================================ */
+(function init(){
+  const saved = localStorage.getItem(LS_THEME);
+  applyTheme(saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+  buildShell();
+  buildFooter();
+  loadAll(true);
+
+  $("#themeBtn").addEventListener("click", () =>
+    applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark"));
+  $("#reload").addEventListener("click", () => { closePanel(); loadAll(true); });
+  $("#allOpen").addEventListener("click", () => {
+    $$(".sec").forEach(el => el.classList.remove("closed"));
+    saveClosedFromDom();
+    setTimeout(() => $$(".sec").forEach(el => { const c = el.dataset.id; if(["rmb","bond","debt","rate"].includes(c)) {} }), 0);
+  });
+  $("#allClose").addEventListener("click", () => {
+    closePanel();
+    $$(".sec").forEach(el => el.classList.add("closed"));
+    saveClosedFromDom();
+  });
+  $("#autoBtn").addEventListener("click", () => {
+    const b = $("#autoBtn");
+    if(autoTimer){ clearInterval(autoTimer); autoTimer = null; b.textContent = "自动刷新 关"; b.classList.remove("on"); }
+    else{
+      autoTimer = setInterval(() => loadAll(false), 30000);
+      b.textContent = "自动刷新 30s"; b.classList.add("on");
+    }
+  });
+  window.addEventListener("beforeunload", closePanel);
+})();
+</script>
+</body>
+</html>
