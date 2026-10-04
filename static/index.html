@@ -388,18 +388,18 @@ function gsrc(list){
    板块定义（srcs = 该板块真实数据源）
 ================================================================ */
 const SECTIONS = [
-  {id:"fx",     title:"汇率行情",       srcs:[SRC.fxLive, SRC.fxHis],  open:true },
   {id:"world",  title:"世界股市行情",   srcs:[SRC.cnIdx, SRC.hkIdx, SRC.jjhIdx], open:true },
   {id:"us",     title:"美股三大指数与指数期货", srcs:[SRC.jjhIdx, SRC.sinaFut], open:true },
-  {id:"crypto", title:"虚拟币行情",     srcs:[SRC.sinaCry, SRC.gate], open:true },
-  {id:"fut",    title:"国际期货行情",   srcs:[SRC.sinaFut, SRC.sinaFutH], open:true },
+  {id:"fx",     title:"汇率行情",       srcs:[SRC.fxLive, SRC.fxHis],  open:true },
   {id:"rmb",    title:"人民币汇率指数", srcs:[SRC.rmb], open:false },
   {id:"bond",   title:"世界各国国债收益率", srcs:[SRC.bondLive, SRC.bondHis], open:false },
   {id:"debt",   title:"美国国债数据",   srcs:[SRC.debt], open:false },
-  {id:"rate",   title:"各国央行利率",   srcs:[SRC.rate], open:false }
+  {id:"rate",   title:"各国央行利率",   srcs:[SRC.rate], open:false },
+  {id:"fut",    title:"国际期货行情",   srcs:[SRC.sinaFut, SRC.sinaFutH], open:false },
+  {id:"crypto", title:"虚拟币行情",     srcs:[SRC.sinaCry, SRC.gate], open:false }
 ];
 
-const LS_ORDER = "gfd.order.v2", LS_CLOSED = "gfd.closed.v2", LS_THEME = "gfd.theme";
+const LS_ORDER = "gfd.order.v3", LS_CLOSED = "gfd.closed.v2", LS_THEME = "gfd.theme";
 
 function getOrder(){
   let o = [];
