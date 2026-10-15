@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" width="120" alt="global-finance-dashboard"></p>
+
 # 全球金融数据看板（Global Finance Dashboard）
 
 一个**纯本地运行**的全球金融行情聚合看板：一个 Python 文件负责抓数据，一个 HTML 页面负责展示。
